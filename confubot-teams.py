@@ -5,6 +5,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
+    print('Request for index page received')
     return "✅ Flask app is running on Azure!"
 
 if __name__ == "__main__":
