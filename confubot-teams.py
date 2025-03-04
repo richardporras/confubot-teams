@@ -11,7 +11,7 @@ def index():
    return "OK"
 
 @app.route('/ping')
-def index():
+def ping():
    print('Request for ping')
    return "Pong"
 
