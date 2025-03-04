@@ -18,7 +18,7 @@ def home():
 # 🔹 Configuración de Azure Cognitive Search
 AZURE_SEARCH_SERVICE = os.getenv("AZURE_SEARCH_SERVICE")
 AZURE_SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
-INDEX_NAME = "confluence-arq"
+INDEX_NAME = "confluence-index"
 
 if not AZURE_SEARCH_SERVICE or not AZURE_SEARCH_API_KEY:
     raise ValueError("❌ ERROR: Missing environment variables for Azure Search")
