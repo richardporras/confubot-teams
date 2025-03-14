@@ -119,9 +119,9 @@ def messages():
             "type": "message",
             "text": response_text,
             "from": {"id": "bot"},
-            "recipient": {"id": body["from"]["id"]}
-            #"replyToId": body.get("id")
-            #"serviceUrl": body.get("serviceUrl")  # 🔹 Agregar el serviceUrl de la petición
+            "recipient": {"id": body["from"]["id"]},
+            "replyToId": body.get("id"),
+            "serviceUrl": body.get("serviceUrl")  # 🔹 Agregar el serviceUrl de la petición
         }
 
         logging.info(f"✅ Respuesta enviada: {activity}")
