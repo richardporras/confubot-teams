@@ -1,7 +1,8 @@
 flask==3.1.0
-requests>=2.23.0,<2.26.0
+requests>=2.23.0,<2.27.0
 botbuilder-core==4.14.2
 botbuilder-schema==4.14.2
 azure-search-documents==11.5.0
 aiohttp==3.9.1
+urllib3<2.0  # 🔹 Para evitar problemas con requests y botframework
 gunicorn

@@ -1,10 +1,11 @@
 import os
 import requests
 import logging
+import re
 from flask import Flask, request, jsonify
 from botbuilder.schema import Activity, ActivityTypes
 
-# Habilitar logging para depuración
+# 🔹 Configuración de logs para depuración
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
@@ -19,15 +20,48 @@ AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")  # URL de Azure OpenA
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")  # Clave API
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")  # Nombre del deployment
 
+def preprocess_query_for_search(query):
+    """🔍 Optimiza la query antes de enviarla a Azure Cognitive Search."""
+    
+    # 🔹 Convertimos la pregunta a minúsculas
+    query = query.lower()
+    
+    # 🔹 Eliminamos palabras irrelevantes para la búsqueda
+    stopwords = ["cuál", "cuáles", "cómo", "puedo", "sería", "son", "el", "la", "los", "las", "de", "en", "para"]
+    words = query.split()
+    filtered_words = [word for word in words if word not in stopwords]
+    
+    # 🔹 Eliminamos signos de puntuación
+    clean_query = re.sub(r"[^\w\s]", "", " ".join(filtered_words))
+    
+    logging.info(f"🔍 Query original: {query} → Query optimizada: {clean_query}")
+    return clean_query
+
 def search_azure(query):
-    """🔍 Busca información en Azure Cognitive Search."""
+    """🔍 Mejora la búsqueda en Azure Cognitive Search para incluir más términos y mejores resultados."""
+    optimized_query = preprocess_query_for_search(query)  # 🔹 Optimizamos la query antes de enviarla
+
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
-    payload = {"search": query, "top": 10, "select": "title,content,url"}
+    
+    payload = {
+        "search": optimized_query,  # 🔹 Usamos la query optimizada
+        "queryType": "semantic",
+        "searchFields": "title,content",
+        "top": 10,
+        "select": "title,content,url",
+        "filter": "length(content) gt 0"
+    }
+
+    logging.info(f"🔍 Enviando consulta mejorada a Azure Search: {payload}")
 
     response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+    
+    logging.info(f"📩 Resultados de Azure Search: {response_data}")
+
     if response.status_code == 200:
-        return response.json().get("value", [])
+        return response_data.get("value", [])
     return []
 
 def generate_response(query, search_results):
@@ -74,7 +108,6 @@ def generate_response(query, search_results):
         response_text += f"\n\n🔗 [Consulta más detalles en Confluence: {best_title}]({best_url})"
 
     return response_text
-
 
 @app.route("/api/messages", methods=["POST"])
 def messages():
