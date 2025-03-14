@@ -23,7 +23,7 @@ def search_azure(query):
     """🔍 Busca información en Azure Cognitive Search."""
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
-    payload = {"search": query, "top": 10, "select": "title,content,url"}
+    payload = {"search": query, "top": 5, "select": "title,content,url"}
 
     response = requests.post(url, headers=headers, json=payload)
     if response.status_code == 200:
@@ -39,11 +39,11 @@ def generate_response(query, search_results):
         # 🔹 Seleccionamos el primer documento como referencia principal
         best_document = search_results[0]
         best_title = best_document["title"]
-        best_content = best_document["content"][:2000]  # 🔹 Limitamos a 2000 caracteres
+        best_content = best_document["content"][:2000]  # 🔹 Limitamos a 4000 caracteres
         best_url = best_document["url"]
 
         # 🔹 Creamos el contexto para OpenAI
-        context = "\n\n".join([f"- **{doc['title']}**: {doc['content'][:1000]}" for doc in search_results])
+        context = "\n\n".join([f"- **{doc['title']}**: {doc['content'][:2000]}" for doc in search_results])
         context_prompt = f"""Estos son los documentos relevantes de Confluence:
 
         {context}
