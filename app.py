@@ -114,13 +114,14 @@ def messages():
         search_results = search_azure(user_query)
         response_text = generate_response(user_query, search_results)
 
-        # 🔹 Asegurar que "replyToId" esté en la respuesta
+        # 🔹 Asegurar que "replyToId" y "serviceUrl" estén en la respuesta
         activity = {
             "type": "message",
             "text": response_text,
             "from": {"id": "bot"},
-            "recipient": {"id": body["from"]["id"]},  # 🔹 Asegurar que el bot responde al usuario correcto
-            "replyToId": body.get("id")  # 🔹 IMPORTANTE para WebChat
+            "recipient": {"id": body["from"]["id"]},
+            "replyToId": body.get("id"),
+            "serviceUrl": body.get("serviceUrl")  # 🔹 Agregar el serviceUrl de la petición
         }
 
         logging.info(f"✅ Respuesta enviada: {activity}")
