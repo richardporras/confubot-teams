@@ -84,9 +84,9 @@ def generate_response(query, search_results):
 
 @app.route("/api/messages", methods=["POST"])
 def messages():
-    """📩 Maneja mensajes recibidos desde Microsoft Teams y Direct Line."""
+    """📩 Maneja mensajes recibidos desde WebChat."""
     
-    # 🔹 Loggear las cabeceras completas de la petición HTTP
+    # 🔹 Loggear la petición completa
     logging.info(f"📩 Petición recibida: {request.method} {request.url}")
     logging.info(f"🔍 Cabeceras: {dict(request.headers)}")
 
@@ -95,13 +95,17 @@ def messages():
         body = request.get_json()
         logging.info(f"📩 Cuerpo de la petición: {body}")
 
-        # 🔹 Validar estructura del mensaje
-        if not body or "type" not in body or body["type"] != "message":
-            logging.error("❌ Error: Tipo de mensaje no válido.")
+        # 🔹 Ignorar mensajes de inicio de conversación en WebChat
+        if body.get("type") == "conversationUpdate":
+            logging.info("🔹 Mensaje de tipo 'conversationUpdate' recibido. No se requiere respuesta.")
+            return jsonify({"status": "Conversación iniciada"}), 200
+
+        # 🔹 Asegurar que es un mensaje de usuario
+        if body.get("type") != "message":
+            logging.error(f"❌ Error: Tipo de mensaje no válido ({body.get('type')}).")
             return jsonify({"error": "Tipo de mensaje no válido"}), 400
 
         user_query = body.get("text", "").strip()
-
         if not user_query:
             logging.error("❌ Error: El mensaje está vacío.")
             return jsonify({"error": "Mensaje vacío"}), 400
@@ -110,12 +114,13 @@ def messages():
         search_results = search_azure(user_query)
         response_text = generate_response(user_query, search_results)
 
-        # 🔹 Estructura de respuesta para Direct Line
+        # 🔹 Asegurar que "replyToId" esté en la respuesta
         activity = {
             "type": "message",
             "text": response_text,
             "from": {"id": "bot"},
-            "recipient": body.get("from", {"id": "user"})
+            "recipient": {"id": body["from"]["id"]},  # 🔹 Asegurar que el bot responde al usuario correcto
+            "replyToId": body.get("id")  # 🔹 IMPORTANTE para WebChat
         }
 
         logging.info(f"✅ Respuesta enviada: {activity}")
