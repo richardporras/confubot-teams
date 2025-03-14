@@ -4,7 +4,7 @@ import logging
 from flask import Flask, request, jsonify
 from botbuilder.schema import Activity, ActivityTypes
 
-# Habilitar logging para depuración
+# 🔹 Habilitar logging para depuración detallada
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
@@ -25,9 +25,15 @@ def search_azure(query):
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
     payload = {"search": query, "top": 5, "select": "title,content,url"}
 
+    logging.info(f"🔍 Enviando consulta a Azure Search: {payload}")
+
     response = requests.post(url, headers=headers, json=payload)
     if response.status_code == 200:
-        return response.json().get("value", [])
+        results = response.json().get("value", [])
+        logging.info(f"📩 Resultados de Azure Search: {len(results)} documentos encontrados")
+        return results
+    
+    logging.error(f"❌ Error en Azure Search: {response.status_code} - {response.text}")
     return []
 
 def generate_response(query, search_results):
@@ -38,12 +44,12 @@ def generate_response(query, search_results):
     if search_results:
         # 🔹 Seleccionamos el primer documento como referencia principal
         best_document = search_results[0]
-        best_title = best_document["title"]
-        best_content = best_document["content"][:2000]  # 🔹 Limitamos a 4000 caracteres
-        best_url = best_document["url"]
+        best_title = best_document.get("title", "Documento sin título")
+        best_content = best_document.get("content", "")[:2000]
+        best_url = best_document.get("url", "")
 
         # 🔹 Creamos el contexto para OpenAI
-        context = "\n\n".join([f"- **{doc['title']}**: {doc['content'][:2000]}" for doc in search_results])
+        context = "\n\n".join([f"- **{doc.get('title', 'Documento sin título')}**: {doc.get('content', '')[:2000]}" for doc in search_results])
         context_prompt = f"""Estos son los documentos relevantes de Confluence:
 
         {context}
@@ -78,18 +84,47 @@ def generate_response(query, search_results):
 
 @app.route("/api/messages", methods=["POST"])
 def messages():
-    """📩 Maneja mensajes recibidos en Microsoft Teams."""
-    body = request.json
-    user_query = body.get("text")
+    """📩 Maneja mensajes recibidos desde Microsoft Teams y Direct Line."""
+    
+    # 🔹 Loggear las cabeceras completas de la petición HTTP
+    logging.info(f"📩 Petición recibida: {request.method} {request.url}")
+    logging.info(f"🔍 Cabeceras: {dict(request.headers)}")
 
-    if not user_query:
-        return jsonify({"status": "No se recibió un mensaje válido"}), 400
+    try:
+        # 🔹 Loggear el cuerpo de la petición
+        body = request.get_json()
+        logging.info(f"📩 Cuerpo de la petición: {body}")
 
-    search_results = search_azure(user_query)
-    response_text = generate_response(user_query, search_results)
+        # 🔹 Validar estructura del mensaje
+        if not body or "type" not in body or body["type"] != "message":
+            logging.error("❌ Error: Tipo de mensaje no válido.")
+            return jsonify({"error": "Tipo de mensaje no válido"}), 400
 
-    activity = Activity(type=ActivityTypes.message, text=response_text)
-    return jsonify(activity.serialize()), 200
+        user_query = body.get("text", "").strip()
+
+        if not user_query:
+            logging.error("❌ Error: El mensaje está vacío.")
+            return jsonify({"error": "Mensaje vacío"}), 400
+
+        # 🔹 Buscar en Azure Cognitive Search
+        search_results = search_azure(user_query)
+        response_text = generate_response(user_query, search_results)
+
+        # 🔹 Estructura de respuesta para Direct Line
+        activity = {
+            "type": "message",
+            "text": response_text,
+            "from": {"id": "bot"},
+            "recipient": body.get("from", {"id": "user"})
+        }
+
+        logging.info(f"✅ Respuesta enviada: {activity}")
+        return jsonify(activity), 200
+
+    except Exception as e:
+        logging.error(f"❌ Error procesando la petición: {str(e)}", exc_info=True)
+        return jsonify({"error": "Error interno del servidor"}), 500
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
