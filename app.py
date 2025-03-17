@@ -12,7 +12,7 @@ app = Flask(__name__)
 # 🔹 Configuración de Azure Cognitive Search
 AZURE_SEARCH_SERVICE = os.getenv("AZURE_SEARCH_SERVICE")
 AZURE_SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
-INDEX_NAME = "confluence-index"
+INDEX_NAME = os.getenv("AZURE_SEARCH_INDEX")
 
 # 🔹 Configuración de Azure OpenAI
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")  # URL de Azure OpenAI
