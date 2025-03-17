@@ -23,7 +23,7 @@ def search_azure(query):
     """🔍 Busca información en Azure Cognitive Search."""
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
-    payload = {"search": query, "top": 5, "select": "title,content,url"}
+    payload = {"search": query, "top": 20, "select": "title,content,url"}
 
     logging.info(f"🔍 Enviando consulta a Azure Search: {payload}")
 
@@ -45,7 +45,6 @@ def generate_response(query, search_results):
         # 🔹 Seleccionamos el primer documento como referencia principal
         best_document = search_results[0]
         best_title = best_document.get("title", "Documento sin título")
-        best_content = best_document.get("content", "")[:2000]
         best_url = best_document.get("url", "")
 
         # 🔹 Creamos el contexto para OpenAI
