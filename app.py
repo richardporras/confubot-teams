@@ -31,65 +31,67 @@ adapter_settings = BotFrameworkAdapterSettings(
 )
 adapter = BotFrameworkAdapter(adapter_settings)
 
+# 🔹 Prompts por intención
+INTENT_PROMPTS = {
+    "consulta_directa": "Eres un asistente técnico experto en documentación interna de Confluence. Usa la información para responder a la pregunta.",
+    "resumen": "Resume la información proporcionada de manera clara, concisa y útil.",
+    "extraccion": "Extrae datos clave y listados relevantes de la siguiente información."
+}
+
 async def on_message_activity(turn_context: TurnContext):
     user_query = turn_context.activity.text.strip()
-
     logging.info(f"🔍 Usuario pregunta: {user_query}")
 
+    intent = detect_intent(user_query)
+    logging.info(f"🔍 Intención detectada: {intent}")
+
     search_results = search_azure(user_query)
-    response_text = generate_response(user_query, search_results)
+    context = build_context(search_results)
+    prompt_instruction = INTENT_PROMPTS.get(intent, INTENT_PROMPTS["consulta_directa"])
+    response_text = generate_openai_response(user_query, context, prompt_instruction)
+
+    if search_results:
+        doc = search_results[0]
+        response_text += f"\n\n🔗 [Más detalles en Confluence: {doc.get('title')}]({doc.get('url')})"
 
     logging.info(f"🤖 Respuesta del bot: {response_text}")
+    await turn_context.send_activity(Activity(type=ActivityTypes.message, text=response_text))
 
-    await turn_context.send_activity(
-        Activity(type=ActivityTypes.message, text=response_text)
-    )
+def detect_intent(query):
+    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
+    headers = {"Content-Type": "application/json", "api-key": AZURE_OPENAI_API_KEY}
+    messages = [
+        {"role": "system", "content": "Clasifica esta consulta como 'resumen', 'extraccion' o 'consulta_directa'. Solo responde con una de esas palabras."},
+        {"role": "user", "content": query}
+    ]
+    payload = {"messages": messages, "temperature": 0, "max_tokens": 10}
+    response = requests.post(url, headers=headers, json=payload)
+    return response.json().get("choices", [{}])[0].get("message", {}).get("content", "consulta_directa").strip().lower()
 
 def search_azure(query):
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
     payload = {"search": query, "top": 5, "select": "title,content,url"}
-
     response = requests.post(url, headers=headers, json=payload)
     return response.json().get("value", []) if response.ok else []
 
-def generate_response(query, search_results):
-    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
-    headers = {"Content-Type": "application/json", "api-key": AZURE_OPENAI_API_KEY}
-
-    context = "\n\n".join(
+def build_context(search_results):
+    return "\n\n".join(
         [f"- **{doc.get('title', 'Documento sin título')}**: {doc.get('content', '')[:10000]}"
          for doc in search_results]
     )
 
-    context_prompt = (
-        "Estos son los documentos relevantes de Confluence:\n\n"
-        f"{context}\n\n"
-        "Usa esta información para responder a la siguiente pregunta de forma precisa."
-        if search_results else
-        "No se encontraron documentos relevantes. Intenta responder lo mejor posible."
-    )
-
+def generate_openai_response(query, context, prompt_instruction):
+    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
+    headers = {"Content-Type": "application/json", "api-key": AZURE_OPENAI_API_KEY}
     messages = [
-        {"role": "system", "content": "Eres un asistente técnico experto en documentación interna."},
-        {"role": "assistant", "content": context_prompt},
+        {"role": "system", "content": prompt_instruction},
+        {"role": "assistant", "content": context},
         {"role": "user", "content": f"Pregunta: {query}"}
     ]
-
     payload = {"messages": messages, "temperature": 0.2, "max_tokens": 900}
-
     response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    response_text = response_data.get("choices", [{}])[0].get("message", {}).get("content", "No encontré información relevante.")
-
-    if search_results:
-        best_document = search_results[0]
-        best_title = best_document.get("title", "Documento sin título")
-        best_url = best_document.get("url", "")
-        response_text += f"\n\n🔗 [Más detalles en Confluence: {best_title}]({best_url})"
-
-    return response_text
+    return response.json().get("choices", [{}])[0].get("message", {}).get("content", "No encontré información relevante.")
 
 @app.route("/api/messages", methods=["POST"])
 async def messages():
@@ -106,7 +108,6 @@ async def messages():
             logging.info("🔹 Ignorando mensaje sin texto.")
 
     await adapter.process_activity(activity, auth_header, aux_func)
-
     return Response(status=201)
 
 if __name__ == "__main__":
