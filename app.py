@@ -99,20 +99,36 @@ def generate_response_by_intent(query, search_results, intent):
 
 @app.route("/api/messages", methods=["POST"])
 async def messages():
-    body = await request.get_json()
-    logging.info(f"📩 Petición recibida: {body}")
+    try:
+        body = await request.get_json()
+        logging.info(f"📩 Petición recibida: {body}")
 
-    auth_header = request.headers.get("Authorization", "")
-    activity = Activity().deserialize(body)
+        auth_header = request.headers.get("Authorization", "")
+        activity = Activity().deserialize(body)
 
-    async def aux_func(turn_context: TurnContext):
-        if turn_context.activity.type == ActivityTypes.message and turn_context.activity.text:
-            await on_message_activity(turn_context)
-        else:
-            logging.info("🔹 Ignorando mensaje sin texto.")
+        async def aux_func(turn_context: TurnContext):
+            try:
+                if turn_context.activity.type == ActivityTypes.message and turn_context.activity.text:
+                    await on_message_activity(turn_context)
+                else:
+                    logging.info("🔹 Ignorando mensaje sin texto.")
+            except Exception as e:
+                logging.error(f"❌ Error procesando mensaje del usuario: {e}", exc_info=True)
+                await turn_context.send_activity(
+                    Activity(type=ActivityTypes.message, text="Se ha producido un error procesando tu mensaje.")
+                )
 
-    await adapter.process_activity(activity, auth_header, aux_func)
-    return Response(status=201)
+        await adapter.process_activity(activity, auth_header, aux_func)
+        return Response(status=201)
+
+    except PermissionError as e:
+        logging.warning(f"🔐 Acceso no autorizado: {e}")
+        return Response("Unauthorized", status=401)
+
+    except Exception as e:
+        logging.error(f"❌ Error general en la ruta /api/messages: {e}", exc_info=True)
+        return Response("Internal Server Error", status=500)
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
