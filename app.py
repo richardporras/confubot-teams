@@ -92,10 +92,25 @@ def generate_openai_response(query, context, intent):
 def generate_response_by_intent(query, search_results, intent):
     context = build_context(search_results)
     response = generate_openai_response(query, context, intent)
-    if search_results:
-        doc = search_results[0]
-        response += f"\n\n🔗 [Más detalles en Confluence: {doc.get('title')}]({doc.get('url')})"
+
+    # 🔹 Recoger hasta 3 URLs únicas con su score
+    seen_urls = set()
+    enlaces = []
+    for doc in search_results:
+        url = doc.get("url", "")
+        score = doc.get("@search.score", 0.0)
+        if url and url not in seen_urls:
+            seen_urls.add(url)
+            title = doc.get("title", "Documento sin título")
+            enlaces.append(f"🔗 [{title}]({url}) (score: {score:.2f})")
+        if len(enlaces) == 3:
+            break
+
+    if enlaces:
+        response += "\n\n" + "\n\n".join(enlaces)
+
     return response
+
 
 @app.route("/api/messages", methods=["POST"])
 async def messages():
