@@ -56,12 +56,20 @@ def detect_intent(query):
     url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_OPENAI_API_KEY}
     messages = [
-        {"role": "system", "content": "Clasifica esta consulta como 'resumen', 'extraccion' o 'consulta_directa'. Solo responde con una de esas palabras."},
+        {
+            "role": "system",
+            "content": (
+                "Clasifica esta consulta como 'resumen', 'extraccion', 'consulta_directa' "
+                "o 'fuera_de_dominio' si no está relacionada con temas técnicos o documentación interna."
+                " Solo responde con una de esas palabras."
+            )
+        },
         {"role": "user", "content": query}
     ]
     payload = {"messages": messages, "temperature": 0, "max_tokens": 10}
     response = requests.post(url, headers=headers, json=payload)
     return response.json().get("choices", [{}])[0].get("message", {}).get("content", "consulta_directa").strip().lower()
+
 
 def search_azure(query):
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
@@ -99,6 +107,12 @@ def generate_openai_response(query, context, intent):
     return response.json().get("choices", [{}])[0].get("message", {}).get("content", "No encontré información relevante.")
 
 def generate_response_by_intent(query, search_results, intent):
+    if intent == "fuera_de_dominio":
+        return (
+            "Lo siento, pero no puedo ayudarte con esa consulta porque no está relacionada con documentación técnica "
+            "o interna. Estoy aquí para asistirte en temas de Confluence o de arquitectura IT."
+        )
+
     context = build_context(search_results)
     response = generate_openai_response(query, context, intent)
 
@@ -119,7 +133,6 @@ def generate_response_by_intent(query, search_results, intent):
         response += "\n\n" + "\n\n".join(enlaces)
 
     return response
-
 
 @app.route("/api/messages", methods=["POST"])
 async def messages():
