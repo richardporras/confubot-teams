@@ -67,8 +67,17 @@ def search_azure(query):
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
     payload = {"search": query, "top": 5, "select": "title,content,url"}
+    
     response = requests.post(url, headers=headers, json=payload)
-    return response.json().get("value", []) if response.ok else []
+    
+    if not response.ok:
+        return []
+
+    # 🔹 Filtrar por umbral mínimo de score
+    min_score_threshold = float(os.getenv("MIN_SCORE_THRESHOLD", 10))
+    results = response.json().get("value", [])
+    return [doc for doc in results if doc.get("@search.score", 0) >= min_score_threshold]
+
 
 def build_context(search_results):
     return "\n\n".join(
