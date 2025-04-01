@@ -102,7 +102,7 @@ def generate_response_by_intent(query, search_results, intent):
     context = build_context(search_results)
     response = generate_openai_response(query, context, intent)
 
-    # 🔹 Recoger hasta 3 URLs únicas con su score
+    # 🔹 Recoger URLs únicas con su score
     seen_urls = set()
     enlaces = []
     for doc in search_results:
@@ -112,8 +112,6 @@ def generate_response_by_intent(query, search_results, intent):
             seen_urls.add(url)
             title = doc.get("title", "Documento sin título")
             enlaces.append(f"🔗 [{title}]({url}) (score: {score:.2f})")
-        if len(enlaces) == 3:
-            break
 
     if enlaces:
         response += "\n\n" + "\n\n".join(enlaces)
