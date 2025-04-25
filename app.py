@@ -86,7 +86,11 @@ def build_context(search_results):
     )
 
 def generate_openai_response(query, context, intent):
-    instruction = f"{PROMPT_BASE} {INTENT_PROMPTS.get(intent, INTENT_PROMPTS['consulta_directa'])}"
+    instruction = (
+        f"{PROMPT_BASE} {INTENT_PROMPTS.get(intent, INTENT_PROMPTS['consulta_directa'])} "
+        "Responde únicamente usando el contenido proporcionado. "
+        "Si no encuentras información relevante en los documentos, indica que no hay suficiente información."
+    )
     url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_OPENAI_API_KEY}
     messages = [
