@@ -1,6 +1,9 @@
 import os
 import requests
 import logging
+from functools import wraps
+import base64
+import time
 from quart import Quart, request, jsonify, Response
 from botbuilder.core import (
     BotFrameworkAdapter,
@@ -25,6 +28,9 @@ AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 
+USERNAME = os.getenv("BASIC_AUTH_USER", "admin")
+PASSWORD = os.getenv("BASIC_AUTH_PASS", "password")
+
 # 🔹 Bot Adapter Settings
 adapter_settings = BotFrameworkAdapterSettings(
     app_id=os.getenv("BOT_APP_ID"), app_password=os.getenv("BOT_APP_SECRET")
@@ -38,6 +44,23 @@ INTENT_PROMPTS = {
     "extraccion": "Extrae datos clave y listados relevantes de la siguiente información.",
     "consulta_directa": "Responde de forma precisa usando solo la información proporcionada."
 }
+
+def require_basic_auth(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        auth = request.headers.get("Authorization")
+        if not auth or not auth.startswith("Basic "):
+            return Response("Unauthorized", status=401, headers={"WWW-Authenticate": 'Basic realm="Login Required"'})
+        try:
+            encoded_credentials = auth.split(" ")[1]
+            decoded = base64.b64decode(encoded_credentials).decode("utf-8")
+            user, pwd = decoded.split(":", 1)
+        except Exception:
+            return Response("Unauthorized", status=401)
+        if user != USERNAME or pwd != PASSWORD:
+            return Response("Unauthorized", status=401)
+        return await func(*args, **kwargs)
+    return wrapper
 
 async def on_message_activity(turn_context: TurnContext):
     user_query = turn_context.activity.text.strip()
@@ -154,6 +177,51 @@ async def messages():
     except Exception as e:
         logging.error(f"❌ Error general en la ruta /api/messages: {e}", exc_info=True)
         return Response("Internal Server Error", status=500)
+    
+@app.route("/api/ask", methods=["POST"])
+@require_basic_auth
+async def ask():
+    try:
+        data = await request.get_json()
+        messages = data.get("messages", [])
+
+        if not messages or not isinstance(messages, list):
+            return jsonify({"error": "Missing or invalid 'messages' field"}), 400
+
+        user_message = next((msg["content"] for msg in reversed(messages) if msg.get("role") == "user"), None)
+
+        if not user_message:
+            return jsonify({"error": "No user message found in 'messages'"}), 400
+
+        logging.info(f"🤖 Pregunta MCP: {user_message}")
+
+        intent = detect_intent(user_message)
+        logging.info(f"🔍 Intención detectada: {intent}")
+
+        search_results = search_azure(user_message)
+        response_text = generate_response_by_intent(user_message, search_results, intent)
+
+        return jsonify({
+            "id": "chatcmpl-mcp-server",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": "confubot-mcp",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": response_text
+                    },
+                    "finish_reason": "stop"
+                }
+            ]
+        })
+
+    except Exception as e:
+        logging.error(f"❌ Error en /api/ask MCP: {e}", exc_info=True)
+        return jsonify({"error": "Internal Server Error"}), 500
+
 
 
 if __name__ == "__main__":
