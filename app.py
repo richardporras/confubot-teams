@@ -89,7 +89,7 @@ def detect_intent(query):
 def search_azure(query):
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
-    payload = {"search": query, "top": 5, "select": "title,content,url"}
+    payload = {"search": query, "top": 15, "select": "title,content,url"}
     
     response = requests.post(url, headers=headers, json=payload)
     
@@ -102,11 +102,31 @@ def search_azure(query):
     return [doc for doc in results if doc.get("@search.score", 0) >= min_score_threshold]
 
 
-def build_context(search_results):
-    return "\n\n".join(
-        [f"- **{doc.get('title', 'Documento sin título')}**: {doc.get('content', '')[:10000]}"
-         for doc in search_results]
-    )
+def build_context(search_results, max_total_chars=60000):
+    context_parts = []
+    total_len = 0
+
+    for doc in search_results:
+        title = doc.get("title", "Documento sin título")
+        content = doc.get("content", "")
+
+        # Tus chunks ya son de 3000, pero cortamos por seguridad
+        snippet = content[:3000]
+
+        # 🔹 Un solo salto de línea en lugar de doble
+        entry = f"- **{title}**: {snippet}"
+        entry_len = len(entry)
+
+        if total_len + entry_len > max_total_chars:
+            break
+
+        context_parts.append(entry)
+        total_len += entry_len
+
+    # 🔹 Usamos '\n' en lugar de '\n\n' para ahorrar tokens
+    return "\n".join(context_parts)
+
+
 
 def generate_openai_response(query, context, intent):
     instruction = (
