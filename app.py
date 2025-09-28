@@ -4,6 +4,8 @@ import logging
 from functools import wraps
 import base64
 import time
+from typing import Dict, List
+
 from quart import Quart, request, jsonify, Response
 from botbuilder.core import (
     BotFrameworkAdapter,
@@ -42,7 +44,8 @@ PROMPT_BASE = "Eres un asistente técnico experto en documentación interna de C
 INTENT_PROMPTS = {
     "resumen": "Resume la información proporcionada de manera clara, concisa y útil.",
     "extraccion": "Extrae datos clave y listados relevantes de la siguiente información.",
-    "consulta_directa": "Responde de forma precisa usando solo la información proporcionada."
+    "consulta_directa": "Responde de forma precisa usando solo la información proporcionada.",
+    "procedimiento": "Explica paso a paso el procedimiento o proceso mencionado. Estructura tu respuesta de forma secuencial y práctica, numerando los pasos cuando sea posible."
 }
 
 def require_basic_auth(func):
@@ -75,18 +78,132 @@ async def on_message_activity(turn_context: TurnContext):
     logging.info(f"🤖 Respuesta del bot: {response_text}")
     await turn_context.send_activity(Activity(type=ActivityTypes.message, text=response_text))
 
+def generate_embedding(text: str) -> List[float]:
+    """Genera embedding usando Azure OpenAI text-embedding-3-small"""
+    
+    cleaned_text = text.strip()
+    if len(cleaned_text) > 8000:
+        cleaned_text = cleaned_text[:8000]
+    
+    if not cleaned_text:
+        return [0.0] * 768
+    
+    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/text-embedding-3-small/embeddings?api-version=2024-02-01"
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": AZURE_OPENAI_API_KEY
+    }
+    
+    payload = {
+        "input": cleaned_text,
+        "model": "text-embedding-3-small",
+        "dimensions": 768
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        if response.status_code == 200:
+            result = response.json()
+            return result["data"][0]["embedding"]
+        else:
+            logging.error(f"Error embedding: {response.status_code}")
+            return [0.0] * 768
+    except Exception as e:
+        logging.error(f"Error generando embedding: {e}")
+        return [0.0] * 768
+
 def detect_intent(query):
+    return detect_intent_openai(query)
+
+def detect_intent_local(query):
+    """Detección de intención local - sin llamadas a API"""
+    query_lower = query.lower().strip()
+    
+    # Palabras clave para PROCEDIMIENTO
+    if any(word in query_lower for word in ['cómo', 'como', 'pasos', 'configurar', 'instalar', 'setup', 'crear', 'hacer']):
+        return 'procedimiento'
+    
+    # Palabras clave para RESUMEN
+    if any(word in query_lower for word in ['resume', 'resumen', 'qué es', 'que es', 'explica']):
+        return 'resumen'
+    
+    # Palabras clave para EXTRACCIÓN
+    if any(word in query_lower for word in ['lista', 'extrae', 'puntos', 'datos']):
+        return 'extraccion'
+    
+    # Por defecto: consulta directa
+    return 'consulta_directa'
+
+def detect_intent_openai(query):
     url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_OPENAI_API_KEY}
     messages = [
-        {"role": "system", "content": "Clasifica esta consulta como 'resumen', 'extraccion' o 'consulta_directa'. Solo responde con una de esas palabras."},
+        {"role": "system", "content": "Clasifica esta consulta como 'resumen', 'extraccion', 'procedimiento' o 'consulta_directa'. Solo responde con una de esas palabras."},
         {"role": "user", "content": query}
     ]
     payload = {"messages": messages, "temperature": 0, "max_tokens": 10}
     response = requests.post(url, headers=headers, json=payload)
     return response.json().get("choices", [{}])[0].get("message", {}).get("content", "consulta_directa").strip().lower()
 
-def search_azure(query):
+def search_azure(query) -> List[Dict]:
+    return search_azure_hybrid(query)
+
+def search_azure_hybrid(query: str) -> List[Dict]:
+    """
+    Búsqueda híbrida: keyword + vector search con RRF automático
+    """
+    
+    logging.info(f"🔍 Búsqueda híbrida para: '{query}'")
+    
+    # Generar embedding de la query
+    query_embedding = generate_embedding(query)
+    
+    url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
+    headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
+    
+    payload = {
+        # BÚSQUEDA KEYWORD (tu búsqueda actual)
+        "search": query,
+        "searchMode": "all",
+        
+        # BÚSQUEDA VECTORIAL (sintaxis moderna)
+        "vectorQueries": [{
+            "kind": "vector",
+            "vector": query_embedding,
+            "fields": "content_vector",
+            "k": 50  # Top 50 vectores más similares
+        }],
+        
+        # CONFIGURACIÓN GENERAL
+        "top": 15,
+        "select": "title,content,url,type",
+        "highlight": "content"
+        
+        # Azure hace RRF (Reciprocal Rank Fusion) automáticamente
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        
+        results = response.json().get("value", [])
+        
+        # AJUSTE DE UMBRAL PARA BÚSQUEDA HÍBRIDA
+        # Los scores híbridos suelen ser más bajos debido al RRF
+        min_score_threshold = float(os.getenv("MIN_SCORE_THRESHOLD_HYBRID", "0.01"))  
+        filtered_results = [doc for doc in results if doc.get("@search.score", 0) >= min_score_threshold]
+        
+        logging.info(f"🔍 Búsqueda híbrida '{query}': {len(results)} encontrados, {len(filtered_results)} relevantes")
+        return filtered_results
+        
+    except requests.RequestException as e:
+        logging.error(f"❌ Error en búsqueda híbrida: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"❌ Error procesando resultados: {e}")
+        return []
+
+def search_azure_classic(query) -> List[Dict]:
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
     payload = {"search": query, "top": 15, "select": "title,content,url"}
@@ -100,7 +217,6 @@ def search_azure(query):
     min_score_threshold = float(os.getenv("MIN_SCORE_THRESHOLD", 10))
     results = response.json().get("value", [])
     return [doc for doc in results if doc.get("@search.score", 0) >= min_score_threshold]
-
 
 def build_context(search_results, max_total_chars=60000):
     context_parts = []
@@ -141,7 +257,7 @@ def generate_openai_response(query, context, intent):
         {"role": "assistant", "content": context},
         {"role": "user", "content": f"Pregunta: {query}"}
     ]
-    payload = {"messages": messages, "temperature": 0.2, "max_tokens": 900}
+    payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
     response = requests.post(url, headers=headers, json=payload)
     return response.json().get("choices", [{}])[0].get("message", {}).get("content", "No encontré información relevante.")
 
