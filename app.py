@@ -243,7 +243,6 @@ def build_context(search_results, max_total_chars=60000):
     return "\n".join(context_parts)
 
 
-
 def generate_openai_response(query, context, intent):
     instruction = (
         f"{PROMPT_BASE} {INTENT_PROMPTS.get(intent, INTENT_PROMPTS['consulta_directa'])} "
@@ -274,7 +273,7 @@ def generate_response_by_intent(query, search_results, intent):
         if url and url not in seen_urls:
             seen_urls.add(url)
             title = doc.get("title", "Documento sin título")
-            enlaces.append(f"🔗 [{title}]({url}) (score: {score:.2f})")
+            enlaces.append(f"🔗 [{title}]({url}) (score: {score:.3f})")
 
     if enlaces:
         response += "\n\n" + "\n\n".join(enlaces)
