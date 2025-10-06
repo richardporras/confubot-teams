@@ -12,7 +12,9 @@ from botbuilder.core import (
     BotFrameworkAdapterSettings,
     TurnContext,
 )
+from botframework.connector.auth import MicrosoftAppCredentials
 from botbuilder.schema import Activity, ActivityTypes
+
 
 # 🔹 Habilitar logging
 logging.basicConfig(level=logging.INFO)
@@ -41,10 +43,9 @@ adapter_settings = BotFrameworkAdapterSettings(
     app_id=BOT_APP_ID, app_password=BOT_APP_SECRET)
 
 
-logging.info(f"-------------------BOT_APP_ID: {BOT_APP_ID}")
-logging.info(f"-------------------BOT_APP_SECRET: {BOT_APP_SECRET}")
-
 adapter = BotFrameworkAdapter(adapter_settings)
+MicrosoftAppCredentials.trust_service_url("https://europe.webchat.botframework.com/")
+
 
 # 🔹 Prompts
 PROMPT_BASE = "Eres un asistente técnico experto en documentación interna de Confluence."
