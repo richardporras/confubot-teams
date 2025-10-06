@@ -51,7 +51,7 @@ class TenantAwareAppCredentials(MicrosoftAppCredentials):
         self.oauth_endpoint = (
             f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
         )
-        self.oauth_scope = "https://api.botframework.com/.default"
+        self.oauth_scope = "https://graph.microsoft.com/.default"
 
         logging.info(f"🔐 Usando endpoint OAuth: {self.oauth_endpoint}")
 
@@ -108,21 +108,29 @@ def require_basic_auth(func):
 
 def log_bot_token():
     try:
-        creds = MicrosoftAppCredentials(
+        creds = TenantAwareAppCredentials(
             os.getenv("BOT_APP_ID"),
-            os.getenv("BOT_APP_SECRET")
+            os.getenv("BOT_APP_SECRET"),
+            os.getenv("BOT_TENANT_ID")
         )
-        # 🔹 get_access_token() es síncrono, no uses await
+
+        # Obtener el token del tenant corporativo
         token = creds.get_access_token()
+
+        # Decodificar el JWT sin verificar firma
         decoded = jwt.decode(token, options={"verify_signature": False})
+
         logging.info("🪪 ---- TOKEN DEBUG ----")
         logging.info(f"aud: {decoded.get('aud')}")
         logging.info(f"iss: {decoded.get('iss')}")
         logging.info(f"tid: {decoded.get('tid')}")
         logging.info(f"exp: {decoded.get('exp')}")
+        logging.info(f"endpoint usado: {creds.oauth_endpoint}")
         logging.info("-----------------------")
+
     except Exception as e:
         logging.error(f"Error al obtener token del bot: {e}")
+
 
 async def on_message_activity(turn_context: TurnContext):
     user_query = turn_context.activity.text.strip()
