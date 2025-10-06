@@ -13,6 +13,8 @@ from botbuilder.core import (
     TurnContext,
 )
 from botbuilder.schema import Activity, ActivityTypes
+import jwt
+from botframework.connector.auth import MicrosoftAppCredentials
 
 
 # 🔹 Habilitar logging
@@ -38,10 +40,7 @@ BOT_APP_ID = os.getenv("BOT_APP_ID")
 BOT_APP_SECRET= os.getenv("BOT_APP_SECRET")
 
 # 🔹 Bot Adapter Settings
-adapter_settings = BotFrameworkAdapterSettings(
-    app_id=BOT_APP_ID, app_password=BOT_APP_SECRET)
-
-
+adapter_settings = BotFrameworkAdapterSettings(app_id=BOT_APP_ID, app_password=BOT_APP_SECRET)
 adapter = BotFrameworkAdapter(adapter_settings)
 
 # 🔹 Prompts
@@ -70,6 +69,23 @@ def require_basic_auth(func):
         return await func(*args, **kwargs)
     return wrapper
 
+async def log_bot_token():
+    try:
+        creds = MicrosoftAppCredentials(
+            os.getenv("BOT_APP_ID"),
+            os.getenv("BOT_APP_SECRET")
+        )
+        token = await creds.get_access_token()
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        logging.info("🪪 ---- TOKEN DEBUG ----")
+        logging.info(f"aud: {decoded.get('aud')}")
+        logging.info(f"iss: {decoded.get('iss')}")
+        logging.info(f"tid: {decoded.get('tid')}")
+        logging.info(f"exp: {decoded.get('exp')}")
+        logging.info("-----------------------")
+    except Exception as e:
+        logging.error(f"Error al obtener token del bot: {e}")
+
 async def on_message_activity(turn_context: TurnContext):
     user_query = turn_context.activity.text.strip()
     logging.info(f"🔍 Usuario pregunta: {user_query}")
@@ -80,7 +96,8 @@ async def on_message_activity(turn_context: TurnContext):
     search_results = search_azure(user_query)
     response_text = generate_response_by_intent(user_query, search_results, intent)
 
-    logging.info(f"🤖 Respuesta del bot: {response_text}")
+    await log_bot_token()   
+    #logging.info(f"🤖 Respuesta del bot: {response_text}")
     await turn_context.send_activity(Activity(type=ActivityTypes.message, text=response_text))
 
 def generate_embedding(text: str) -> List[float]:
