@@ -12,7 +12,6 @@ from botbuilder.core import (
     BotFrameworkAdapterSettings,
     TurnContext,
 )
-from botframework.connector.auth import MicrosoftAppCredentials
 from botbuilder.schema import Activity, ActivityTypes
 
 
@@ -44,12 +43,6 @@ adapter_settings = BotFrameworkAdapterSettings(
 
 
 adapter = BotFrameworkAdapter(adapter_settings)
-for url in [
-    "https://europe.webchat.botframework.com/",
-    "https://api.botframework.com/",
-]:
-    MicrosoftAppCredentials.trust_service_url(url)
-
 
 # 🔹 Prompts
 PROMPT_BASE = "Eres un asistente técnico experto en documentación interna de Confluence."
