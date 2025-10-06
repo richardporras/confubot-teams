@@ -49,7 +49,7 @@ class TenantAwareAppCredentials(MicrosoftAppCredentials):
 
         # 🔧 Forzamos el endpoint a nuestro tenant, no al global botframework.com
         self.oauth_endpoint = f"https://login.microsoftonline.com/{tenant_id}"
-        self.oauth_scope = "https://api.botframework.com/.default"
+        self.oauth_scope = f"api://{app_id}/.default"
 
 
         logging.info(f"🔐 Usando endpoint OAuth: {self.oauth_endpoint}")
