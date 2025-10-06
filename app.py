@@ -33,10 +33,17 @@ AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 USERNAME = os.getenv("BASIC_AUTH_USER", "admin")
 PASSWORD = os.getenv("BASIC_AUTH_PASS", "password")
 
+BOT_APP_ID = os.getenv("BOT_APP_ID")
+BOT_APP_SECRET= os.getenv("BOT_APP_SECRET")
+
 # 🔹 Bot Adapter Settings
 adapter_settings = BotFrameworkAdapterSettings(
-    app_id=os.getenv("BOT_APP_ID"), app_password=os.getenv("BOT_APP_SECRET")
-)
+    app_id=BOT_APP_ID, app_password=BOT_APP_SECRET)
+
+
+logging.info(f"-------------------BOT_APP_ID: {BOT_APP_ID}")
+logging.info(f"-------------------BOT_APP_SECRET: {BOT_APP_SECRET}")
+
 adapter = BotFrameworkAdapter(adapter_settings)
 
 # 🔹 Prompts
