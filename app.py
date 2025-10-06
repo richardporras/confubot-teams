@@ -69,13 +69,14 @@ def require_basic_auth(func):
         return await func(*args, **kwargs)
     return wrapper
 
-async def log_bot_token():
+def log_bot_token():
     try:
         creds = MicrosoftAppCredentials(
             os.getenv("BOT_APP_ID"),
             os.getenv("BOT_APP_SECRET")
         )
-        token = await creds.get_access_token()
+        # 🔹 get_access_token() es síncrono, no uses await
+        token = creds.get_access_token()
         decoded = jwt.decode(token, options={"verify_signature": False})
         logging.info("🪪 ---- TOKEN DEBUG ----")
         logging.info(f"aud: {decoded.get('aud')}")
@@ -96,7 +97,7 @@ async def on_message_activity(turn_context: TurnContext):
     search_results = search_azure(user_query)
     response_text = generate_response_by_intent(user_query, search_results, intent)
 
-    await log_bot_token()   
+    log_bot_token()   
     #logging.info(f"🤖 Respuesta del bot: {response_text}")
     await turn_context.send_activity(Activity(type=ActivityTypes.message, text=response_text))
 
