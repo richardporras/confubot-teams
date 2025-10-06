@@ -36,12 +36,49 @@ AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 USERNAME = os.getenv("BASIC_AUTH_USER", "admin")
 PASSWORD = os.getenv("BASIC_AUTH_PASS", "password")
 
+# 🔹 Credenciales personalizadas que fuerzan el uso del tenant corporativo
+class TenantAwareAppCredentials(MicrosoftAppCredentials):
+    def __init__(self, app_id: str, password: str, tenant_id: str):
+        # Llamamos al init original
+        super().__init__(app_id, password)
+
+        # Guardamos nuestros propios atributos
+        self.app_id = app_id
+        self.password = password
+        self.tenant_id = tenant_id
+
+        # 🔧 Forzamos el endpoint a nuestro tenant, no al global botframework.com
+        self.oauth_endpoint = (
+            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+        )
+        self.oauth_scope = "https://api.botframework.com/.default"
+
+        logging.info(f"🔐 Usando endpoint OAuth: {self.oauth_endpoint}")
+
+    def get_access_token(self):
+        token = super().get_access_token()
+        logging.info(f"🪪 Token obtenido desde: {self.oauth_endpoint}")
+        return token
+
 BOT_APP_ID = os.getenv("BOT_APP_ID")
 BOT_APP_SECRET= os.getenv("BOT_APP_SECRET")
+TENANT_ID = os.getenv("BOT_TENANT_ID")
 
 # 🔹 Bot Adapter Settings
-adapter_settings = BotFrameworkAdapterSettings(app_id=BOT_APP_ID, app_password=BOT_APP_SECRET)
+#adapter_settings = BotFrameworkAdapterSettings(app_id=BOT_APP_ID, app_password=BOT_APP_SECRET)
+#adapter = BotFrameworkAdapter(adapter_settings)
+
+# 🔹 Inicializamos credenciales y adapter
+creds = TenantAwareAppCredentials(BOT_APP_ID, BOT_APP_SECRET, TENANT_ID)
+adapter_settings = BotFrameworkAdapterSettings(
+    app_id=creds.app_id,
+    app_password=creds.password
+)
 adapter = BotFrameworkAdapter(adapter_settings)
+
+logging.info(
+    f"🤖 Bot inicializado con AppId={BOT_APP_ID}, Tenant={TENANT_ID}"
+)
 
 # 🔹 Prompts
 PROMPT_BASE = "Eres un asistente técnico experto en documentación interna de Confluence."
