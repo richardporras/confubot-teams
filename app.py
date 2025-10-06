@@ -44,7 +44,11 @@ adapter_settings = BotFrameworkAdapterSettings(
 
 
 adapter = BotFrameworkAdapter(adapter_settings)
-MicrosoftAppCredentials.trust_service_url("https://europe.webchat.botframework.com/")
+for url in [
+    "https://europe.webchat.botframework.com/",
+    "https://api.botframework.com/",
+]:
+    MicrosoftAppCredentials.trust_service_url(url)
 
 
 # 🔹 Prompts
