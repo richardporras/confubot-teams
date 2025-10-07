@@ -13,18 +13,10 @@ from botbuilder.core import (
     TurnContext,
 )
 from botbuilder.schema import Activity, ActivityTypes
-import jwt
-from botframework.connector.auth import MicrosoftAppCredentials
-import traceback, json
-
 
 # 🔹 Habilitar logging
-#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 
-# Nivel DEBUG para MSAL
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger("msal")
-logger.setLevel(logging.DEBUG)
 
 # 🔹 Quart App
 app = Quart(__name__)
