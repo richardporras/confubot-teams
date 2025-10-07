@@ -42,48 +42,24 @@ AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 USERNAME = os.getenv("BASIC_AUTH_USER", "admin")
 PASSWORD = os.getenv("BASIC_AUTH_PASS", "password")
 
-# 🔹 Credenciales personalizadas que fuerzan el uso del tenant corporativo
-class TenantAwareAppCredentials(MicrosoftAppCredentials):
-    def __init__(self, app_id: str, password: str, tenant_id: str):
-        # Llamamos al init original
-        super().__init__(app_id, password)
-
-        # Guardamos nuestros propios atributos
-        self.app_id = app_id
-        self.password = password
-        self.tenant_id = tenant_id
-
-        # 🔧 Forzamos el endpoint a nuestro tenant, no al global botframework.com
-        self.oauth_endpoint = "https://login.microsoftonline.com/d6d49420-f39b-4df7-a1dc-d59a935871db"
-        self.oauth_scope = "https://api.botframework.com/.default"
-
-
-        logging.info(f"🔐 Usando endpoint OAuth: {self.oauth_endpoint}")
-
-    def get_access_token(self):
-        token = super().get_access_token()
-        logging.info(f"🪪 Token obtenido desde: {self.oauth_endpoint}")
-        return token
-
 BOT_APP_ID = os.getenv("BOT_APP_ID")
 BOT_APP_SECRET= os.getenv("BOT_APP_SECRET")
-TENANT_ID = os.getenv("BOT_TENANT_ID")
+BOT_TENANT_ID = os.getenv("BOT_TENANT_ID")
 
 
 # 🔹 Bot Adapter Settings
-#adapter_settings = BotFrameworkAdapterSettings(app_id=BOT_APP_ID, app_password=BOT_APP_SECRET)
-#adapter = BotFrameworkAdapter(adapter_settings)
-
-# 🔹 Inicializamos credenciales y adapter
-creds = TenantAwareAppCredentials(BOT_APP_ID, BOT_APP_SECRET, TENANT_ID)
-adapter_settings = BotFrameworkAdapterSettings(
-    app_id=creds.app_id,
-    app_password=creds.password
+# ✅ Configurar adaptador para single-tenant
+settings = BotFrameworkAdapterSettings(
+    app_id=BOT_APP_ID,
+    app_password=BOT_APP_SECRET,
+    channel_auth_tenant=BOT_TENANT_ID,  # 👈 nuevo parámetro clave
+    oauth_endpoint=f"https://login.microsoftonline.com/{BOT_TENANT_ID}/oauth2/v2.0/token"  # 👈 explícitamente tu tenant
 )
-adapter = BotFrameworkAdapter(adapter_settings)
+
+adapter = BotFrameworkAdapter(settings)
 
 logging.info(
-    f"🤖 Bot inicializado con AppId={BOT_APP_ID}, Tenant={TENANT_ID}"
+    f"🤖 Bot inicializado con AppId={BOT_APP_ID}, Tenant={BOT_TENANT_ID}"
 )
 
 # 🔹 Prompts
@@ -112,40 +88,6 @@ def require_basic_auth(func):
         return await func(*args, **kwargs)
     return wrapper
 
-def log_bot_token():
-    try:
-        creds = TenantAwareAppCredentials(
-            os.getenv("BOT_APP_ID"),
-            os.getenv("BOT_APP_SECRET"),
-            os.getenv("BOT_TENANT_ID")
-        )
-
-        # Obtener el token del tenant corporativo
-        token = creds.get_access_token()
-
-        # Decodificar el JWT sin verificar firma
-        decoded = jwt.decode(token, options={"verify_signature": False, "verify_aud": False, "verify_iss": False})
-        logging.info("🪪 ---- TOKEN DEBUG ----")
-        logging.info(f"aud: {decoded.get('aud')}")
-        logging.info(f"iss: {decoded.get('iss')}")
-        logging.info(f"tid: {decoded.get('tid')}")
-        logging.info(f"exp: {decoded.get('exp')}")
-        logging.info(f"endpoint usado: {creds.oauth_endpoint}")
-        logging.info("-----------------------")
-
-    except Exception as e:
-        logging.error("❌ Error al obtener token del bot:")
-        logging.error(traceback.format_exc())
-
-        # Si es un ErrorResponseException, extrae el cuerpo JSON del response
-        if hasattr(e, "response") and e.response is not None:
-            try:
-                body = e.response.json()
-            except Exception:
-                body = e.response.text
-            logging.error(f"🔍 Respuesta completa de Azure AD:\n{json.dumps(body, indent=2) if isinstance(body, dict) else body}")
-
-
 async def on_message_activity(turn_context: TurnContext):
     user_query = turn_context.activity.text.strip()
     logging.info(f"🔍 Usuario pregunta: {user_query}")
@@ -156,7 +98,6 @@ async def on_message_activity(turn_context: TurnContext):
     search_results = search_azure(user_query)
     response_text = generate_response_by_intent(user_query, search_results, intent)
 
-    log_bot_token()   
     #logging.info(f"🤖 Respuesta del bot: {response_text}")
     await turn_context.send_activity(Activity(type=ActivityTypes.message, text=response_text))
 
