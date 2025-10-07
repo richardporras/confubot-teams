@@ -15,10 +15,16 @@ from botbuilder.core import (
 from botbuilder.schema import Activity, ActivityTypes
 import jwt
 from botframework.connector.auth import MicrosoftAppCredentials
+import traceback, json
 
 
 # 🔹 Habilitar logging
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
+
+# Nivel DEBUG para MSAL
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("msal")
+logger.setLevel(logging.DEBUG)
 
 # 🔹 Quart App
 app = Quart(__name__)
@@ -48,8 +54,8 @@ class TenantAwareAppCredentials(MicrosoftAppCredentials):
         self.tenant_id = tenant_id
 
         # 🔧 Forzamos el endpoint a nuestro tenant, no al global botframework.com
-        self.oauth_endpoint = f"https://login.microsoftonline.com/{tenant_id}"
-        self.oauth_scope = f"api://{app_id}/.default"
+        self.oauth_endpoint = "https://login.microsoftonline.com/0637680a-67ee-4b63-acdf-ac82cfcde5ad"
+        self.oauth_scope = "https://api.botframework.com/.default"
 
 
         logging.info(f"🔐 Usando endpoint OAuth: {self.oauth_endpoint}")
@@ -62,6 +68,7 @@ class TenantAwareAppCredentials(MicrosoftAppCredentials):
 BOT_APP_ID = os.getenv("BOT_APP_ID")
 BOT_APP_SECRET= os.getenv("BOT_APP_SECRET")
 TENANT_ID = os.getenv("BOT_TENANT_ID")
+
 
 # 🔹 Bot Adapter Settings
 #adapter_settings = BotFrameworkAdapterSettings(app_id=BOT_APP_ID, app_password=BOT_APP_SECRET)
@@ -117,8 +124,7 @@ def log_bot_token():
         token = creds.get_access_token()
 
         # Decodificar el JWT sin verificar firma
-        decoded = jwt.decode(token, options={"verify_signature": False})
-
+        decoded = jwt.decode(token, options={"verify_signature": False, "verify_aud": False, "verify_iss": False})
         logging.info("🪪 ---- TOKEN DEBUG ----")
         logging.info(f"aud: {decoded.get('aud')}")
         logging.info(f"iss: {decoded.get('iss')}")
@@ -128,7 +134,16 @@ def log_bot_token():
         logging.info("-----------------------")
 
     except Exception as e:
-        logging.error(f"Error al obtener token del bot: {e}")
+        logging.error("❌ Error al obtener token del bot:")
+        logging.error(traceback.format_exc())
+
+        # Si es un ErrorResponseException, extrae el cuerpo JSON del response
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                body = e.response.json()
+            except Exception:
+                body = e.response.text
+            logging.error(f"🔍 Respuesta completa de Azure AD:\n{json.dumps(body, indent=2) if isinstance(body, dict) else body}")
 
 
 async def on_message_activity(turn_context: TurnContext):
