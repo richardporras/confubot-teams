@@ -17,6 +17,7 @@ from botbuilder.schema import Activity, ActivityTypes
 # 🔹 Habilitar logging
 logging.basicConfig(level=logging.INFO)
 
+
 # 🔹 Quart App
 app = Quart(__name__)
 
@@ -33,11 +34,25 @@ AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 USERNAME = os.getenv("BASIC_AUTH_USER", "admin")
 PASSWORD = os.getenv("BASIC_AUTH_PASS", "password")
 
+BOT_APP_ID = os.getenv("BOT_APP_ID")
+BOT_APP_SECRET= os.getenv("BOT_APP_SECRET")
+BOT_TENANT_ID = os.getenv("BOT_TENANT_ID")
+
+
 # 🔹 Bot Adapter Settings
-adapter_settings = BotFrameworkAdapterSettings(
-    app_id=os.getenv("BOT_APP_ID"), app_password=os.getenv("BOT_APP_SECRET")
+# ✅ Configurar adaptador para single-tenant
+settings = BotFrameworkAdapterSettings(
+    app_id=BOT_APP_ID,
+    app_password=BOT_APP_SECRET,
+    channel_auth_tenant=BOT_TENANT_ID,  # 👈 nuevo parámetro clave
+    oauth_endpoint=f"https://login.microsoftonline.com/{BOT_TENANT_ID}/oauth2/v2.0/token"  # 👈 explícitamente tu tenant
 )
-adapter = BotFrameworkAdapter(adapter_settings)
+
+adapter = BotFrameworkAdapter(settings)
+
+logging.info(
+    f"🤖 Bot inicializado con AppId={BOT_APP_ID}, Tenant={BOT_TENANT_ID}"
+)
 
 # 🔹 Prompts
 PROMPT_BASE = "Eres un asistente técnico experto en documentación interna de Confluence."
@@ -75,7 +90,7 @@ async def on_message_activity(turn_context: TurnContext):
     search_results = search_azure(user_query)
     response_text = generate_response_by_intent(user_query, search_results, intent)
 
-    logging.info(f"🤖 Respuesta del bot: {response_text}")
+    #logging.info(f"🤖 Respuesta del bot: {response_text}")
     await turn_context.send_activity(Activity(type=ActivityTypes.message, text=response_text))
 
 def generate_embedding(text: str) -> List[float]:
