@@ -7,7 +7,7 @@ name: Build and deploy Python app to Azure Web App - confubot-teams-pro
 on:
   push:
     branches:
-      - develop
+      - main
   workflow_dispatch:
 
 jobs:
@@ -58,15 +58,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-<<<<<<<< HEAD:.github/workflows/develop_confubot-teams.yml
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_B5FFCB22E4B14188A194C09F1BBCE7A1 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_833695F4E312489FBDF9AED215297F12 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A5E0518D7D72468C92B39F45331C3268 }}
-========
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AADD12390B5C440DA00B7D1A993BF630 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A1395F20C20042379582A11FB1D9DC8A }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_F0954FE63AF941248DFAD1384A85CD75 }}
->>>>>>>> origin/main:.github/workflows/main_confubot-teams-pro.yml
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
