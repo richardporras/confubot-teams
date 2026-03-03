@@ -17,6 +17,7 @@ from botbuilder.core import (
     TurnContext,
 )
 from botbuilder.schema import Activity, ActivityTypes
+from openai import AzureOpenAI
 
 # 🔹 Habilitar logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +35,13 @@ INDEX_NAME = os.getenv("AZURE_SEARCH_INDEX")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+
+# 🔹 Azure OpenAI SDK client
+openai_client = AzureOpenAI(
+    api_key=AZURE_OPENAI_API_KEY,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_version="2024-02-01"
+)
 
 USERNAME = os.getenv("BASIC_AUTH_USER", "admin")
 PASSWORD = os.getenv("BASIC_AUTH_PASS", "password")
@@ -107,26 +115,13 @@ def generate_embedding(text: str) -> List[float]:
     if not cleaned_text:
         return [0.0] * 1536
 
-    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-02-01"
-    headers = {
-        "Content-Type": "application/json",
-        "api-key": AZURE_OPENAI_API_KEY
-    }
-
-    payload = {
-        "input": cleaned_text,
-        "model": "text-embedding-3-large",
-        "dimensions": 1536
-    }
-
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        if response.status_code == 200:
-            result = response.json()
-            return result["data"][0]["embedding"]
-        else:
-            logging.error(f"Error embedding: {response.status_code}")
-            return [0.0] * 1536
+        result = openai_client.embeddings.create(
+            model="text-embedding-3-large",
+            input=cleaned_text,
+            dimensions=1536
+        )
+        return result.data[0].embedding
     except Exception as e:
         logging.error(f"Error generando embedding: {e}")
         return [0.0] * 1536
@@ -154,15 +149,17 @@ def detect_intent_local(query):
     return 'consulta_directa'
 
 def detect_intent_openai(query):
-    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
-    headers = {"Content-Type": "application/json", "api-key": AZURE_OPENAI_API_KEY}
     messages = [
         {"role": "system", "content": "Clasifica esta consulta como 'resumen', 'extraccion', 'procedimiento' o 'consulta_directa'. Solo responde con una de esas palabras."},
         {"role": "user", "content": query}
     ]
-    payload = {"messages": messages, "temperature": 0, "max_tokens": 10}
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json().get("choices", [{}])[0].get("message", {}).get("content", "consulta_directa").strip().lower()
+    result = openai_client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT,
+        messages=messages,
+        temperature=0,
+        max_tokens=10
+    )
+    return result.choices[0].message.content.strip().lower()
 
 def search_azure(query) -> List[Dict]:
     return search_azure_hybrid(query)
@@ -274,16 +271,18 @@ def generate_openai_response(query, context, intent):
         "Responde únicamente usando el contenido proporcionado. "
         "Si no encuentras información relevante en los documentos, indica que no hay suficiente información."
     )
-    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
-    headers = {"Content-Type": "application/json", "api-key": AZURE_OPENAI_API_KEY}
     messages = [
         {"role": "system", "content": instruction},
         {"role": "assistant", "content": context},
         {"role": "user", "content": f"Pregunta: {query}"}
     ]
-    payload = {"messages": messages, "temperature": 0.2, "max_tokens": 1200}
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json().get("choices", [{}])[0].get("message", {}).get("content", "No encontré información relevante.")
+    result = openai_client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT,
+        messages=messages,
+        temperature=0.2,
+        max_tokens=1200
+    )
+    return result.choices[0].message.content
 
 def generate_response_by_intent(query, search_results, intent):
     context = build_context(search_results)
