@@ -273,8 +273,7 @@ def generate_openai_response(query, context, intent):
     )
     messages = [
         {"role": "system", "content": instruction},
-        {"role": "assistant", "content": context},
-        {"role": "user", "content": f"Pregunta: {query}"}
+        {"role": "user", "content": f"### DOCUMENTOS:\n{context}\n\n### PREGUNTA:\n{query}"}
     ]
     result = openai_client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
