@@ -13,7 +13,7 @@ Teams → Bot Framework → Quart Server → Azure Cognitive Search → Azure Op
 - **Servidor**: Quart async (single-file `app.py`)
 - **Búsqueda**: Azure Cognitive Search con búsqueda híbrida (BM25 + vector similarity)
 - **LLM**: Azure OpenAI (GPT-4o-mini)
-- **Embeddings**: text-embedding-3-small (768 dimensiones)
+- **Embeddings**: text-embedding-3-large (1536 dimensiones)
 - **Integración**: Bot Framework para Microsoft Teams
 
 ### Flujo de una consulta
