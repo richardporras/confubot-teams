@@ -37,7 +37,7 @@ The application is a single-file Quart async web server (`app.py`) with two main
 ### Key Components
 
 - **Intent Detection**: Uses Azure OpenAI to classify queries, with local fallback (`detect_intent_local`)
-- **Hybrid Search**: Combines BM25 keyword search with vector similarity using text-embedding-3-small (768 dimensions)
+- **Hybrid Search**: Combines BM25 keyword search with vector similarity using text-embedding-3-large (1536 dimensions)
 - **Bot Adapter**: Configured for single-tenant Azure AD authentication
 
 ## Environment Variables
