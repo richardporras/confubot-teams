@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import re
 import requests
 import logging
 from functools import wraps
@@ -92,9 +93,22 @@ def require_basic_auth(func):
         return await func(*args, **kwargs)
     return wrapper
 
+
+def strip_mentions(text: str) -> str:
+    """Elimina etiquetas <at>...</at> de Teams para limpiar la query."""
+    return re.sub(r"<at>[^<]*</at>", "", text).strip()
+
+
 async def on_message_activity(turn_context: TurnContext):
-    user_query = turn_context.activity.text.strip()
-    logging.info(f"🔍 Usuario pregunta: {user_query}")
+    raw_text = turn_context.activity.text or ""
+    user_query = strip_mentions(raw_text)
+    logging.info(f"🔍 Query limpia: '{user_query}'")
+
+    if not user_query:
+        await turn_context.send_activity(
+            Activity(type=ActivityTypes.message, text="Hola, soy confubot. ¿En qué puedo ayudarte?")
+        )
+        return
 
     intent = detect_intent(user_query)
     logging.info(f"🔍 Intención detectada: {intent}")
