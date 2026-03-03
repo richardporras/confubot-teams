@@ -98,27 +98,27 @@ async def on_message_activity(turn_context: TurnContext):
     await turn_context.send_activity(Activity(type=ActivityTypes.message, text=response_text))
 
 def generate_embedding(text: str) -> List[float]:
-    """Genera embedding usando Azure OpenAI text-embedding-3-small"""
-    
+    """Genera embedding usando Azure OpenAI text-embedding-3-large"""
+
     cleaned_text = text.strip()
     if len(cleaned_text) > 8000:
         cleaned_text = cleaned_text[:8000]
-    
+
     if not cleaned_text:
-        return [0.0] * 768
-    
-    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/text-embedding-3-small/embeddings?api-version=2024-02-01"
+        return [0.0] * 1536
+
+    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-02-01"
     headers = {
         "Content-Type": "application/json",
         "api-key": AZURE_OPENAI_API_KEY
     }
-    
+
     payload = {
         "input": cleaned_text,
-        "model": "text-embedding-3-small",
-        "dimensions": 768
+        "model": "text-embedding-3-large",
+        "dimensions": 1536
     }
-    
+
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         if response.status_code == 200:
@@ -126,10 +126,10 @@ def generate_embedding(text: str) -> List[float]:
             return result["data"][0]["embedding"]
         else:
             logging.error(f"Error embedding: {response.status_code}")
-            return [0.0] * 768
+            return [0.0] * 1536
     except Exception as e:
         logging.error(f"Error generando embedding: {e}")
-        return [0.0] * 768
+        return [0.0] * 1536
 
 def detect_intent(query):
     return detect_intent_openai(query)
