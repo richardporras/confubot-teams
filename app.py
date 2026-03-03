@@ -173,18 +173,23 @@ def search_azure_hybrid(query: str) -> List[Dict]:
     """
     
     logging.info(f"🔍 Búsqueda híbrida para: '{query}'")
-    
+
     # Generar embedding de la query
     query_embedding = generate_embedding(query)
-    
+
     url = f"https://{AZURE_SEARCH_SERVICE}.search.windows.net/indexes/{INDEX_NAME}/docs/search?api-version=2024-07-01"
     headers = {"Content-Type": "application/json", "api-key": AZURE_SEARCH_API_KEY}
-    
+
+    # Si el embedding falló (vector cero), hacer fallback a búsqueda keyword
+    if all(v == 0.0 for v in query_embedding):
+        logging.warning("⚠️ Embedding es vector cero, usando búsqueda keyword como fallback")
+        return search_azure_classic(query)
+
     payload = {
         # BÚSQUEDA KEYWORD (tu búsqueda actual)
         "search": query,
         "searchMode": "all",
-        
+
         # BÚSQUEDA VECTORIAL (sintaxis moderna)
         "vectorQueries": [{
             "kind": "vector",
@@ -192,31 +197,32 @@ def search_azure_hybrid(query: str) -> List[Dict]:
             "fields": "content_vector",
             "k": 50  # Top 50 vectores más similares
         }],
-        
+
         # CONFIGURACIÓN GENERAL
         "top": 15,
         "select": "title,content,url,type",
         "highlight": "content"
-        
+
         # Azure hace RRF (Reciprocal Rank Fusion) automáticamente
     }
-    
+
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
-        
+
         results = response.json().get("value", [])
-        
+
         # AJUSTE DE UMBRAL PARA BÚSQUEDA HÍBRIDA
         # Los scores híbridos suelen ser más bajos debido al RRF
-        min_score_threshold = float(os.getenv("MIN_SCORE_THRESHOLD_HYBRID", "0.01"))  
+        min_score_threshold = float(os.getenv("MIN_SCORE_THRESHOLD_HYBRID", "0.01"))
         filtered_results = [doc for doc in results if doc.get("@search.score", 0) >= min_score_threshold]
-        
+
         logging.info(f"🔍 Búsqueda híbrida '{query}': {len(results)} encontrados, {len(filtered_results)} relevantes")
         return filtered_results
-        
+
     except requests.RequestException as e:
-        logging.error(f"❌ Error en búsqueda híbrida: {e}")
+        error_body = e.response.text if hasattr(e, "response") and e.response is not None else "sin detalle"
+        logging.error(f"❌ Error en búsqueda híbrida: {e} | Detalle Azure: {error_body}")
         return []
     except Exception as e:
         logging.error(f"❌ Error procesando resultados: {e}")
