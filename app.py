@@ -141,7 +141,7 @@ def generate_embedding(text: str) -> List[float]:
         return [0.0] * 1536
 
 def detect_intent(query):
-    return detect_intent_openai(query)
+    return detect_intent_local(query)
 
 def detect_intent_local(query):
     """Detección de intención local - sin llamadas a API"""
@@ -291,7 +291,7 @@ def generate_openai_response(query, context, intent):
     result = openai_client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
-        max_completion_tokens=1200
+        max_completion_tokens=4096
     )
     return result.choices[0].message.content
 
