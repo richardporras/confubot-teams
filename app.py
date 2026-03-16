@@ -338,7 +338,7 @@ def generate_response_by_intent(query, search_results, intent):
         if url and url not in seen_urls:
             seen_urls.add(url)
             title = doc.get("title", "Documento sin título")
-            enlaces.append(f"🔗 [{title}]({url}) (score: {score:.3f})")
+            enlaces.append(f"- 🔗 [{title}]({url}) (score: {score:.3f})")
 
     if enlaces:
         response += "\n\n---\n" + "\n".join(enlaces)
