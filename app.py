@@ -69,12 +69,29 @@ logging.info(
 )
 
 # 🔹 Prompts
-PROMPT_BASE = "Eres un asistente técnico experto en documentación interna de Confluence."
+PROMPT_BASE = (
+    "Eres un asistente técnico experto en documentación interna de Confluence. "
+    "Formatea SIEMPRE tu respuesta en Markdown conciso y profesional: "
+    "usa encabezados (##), listas con viñetas o numeradas, y bloques de código (```) cuando sea apropiado. "
+    "Sé directo y estructurado, evitando párrafos largos."
+)
 INTENT_PROMPTS = {
-    "resumen": "Resume la información proporcionada de manera clara, concisa y útil.",
-    "extraccion": "Extrae datos clave y listados relevantes de la siguiente información.",
-    "consulta_directa": "Responde de forma precisa usando solo la información proporcionada.",
-    "procedimiento": "Explica paso a paso el procedimiento o proceso mencionado. Estructura tu respuesta de forma secuencial y práctica, numerando los pasos cuando sea posible."
+    "resumen": (
+        "Resume la información en un máximo de 3-5 puntos clave. "
+        "Usa viñetas y destaca en negrita los conceptos principales."
+    ),
+    "extraccion": (
+        "Extrae y organiza los datos clave en listas o tablas markdown. "
+        "Agrupa la información por categoría cuando haya varios temas."
+    ),
+    "consulta_directa": (
+        "Responde de forma precisa y estructurada. "
+        "Usa encabezados si la respuesta abarca varios aspectos."
+    ),
+    "procedimiento": (
+        "Explica el procedimiento como una lista numerada de pasos. "
+        "Incluye bloques de código para comandos o configuraciones."
+    ),
 }
 
 def require_basic_auth(func):
@@ -293,6 +310,8 @@ def generate_openai_response(query, context, intent):
     instruction = (
         f"{PROMPT_BASE} {INTENT_PROMPTS.get(intent, INTENT_PROMPTS['consulta_directa'])} "
         "Responde únicamente usando el contenido proporcionado. "
+        "Si la pregunta es ambigua, demasiado corta o genérica (ej: una sola palabra), "
+        "pide al usuario que concrete su consulta en 1-2 frases breves, sin volcar el contenido de los documentos. "
         "Si no encuentras información relevante en los documentos, indica que no hay suficiente información."
     )
     messages = [
@@ -322,7 +341,7 @@ def generate_response_by_intent(query, search_results, intent):
             enlaces.append(f"🔗 [{title}]({url}) (score: {score:.3f})")
 
     if enlaces:
-        response += "\n\n" + "\n\n".join(enlaces)
+        response += "\n\n---\n" + "\n".join(enlaces)
 
     return response
 
