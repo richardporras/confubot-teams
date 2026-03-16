@@ -36,6 +36,7 @@ INDEX_NAME = os.getenv("AZURE_SEARCH_INDEX")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+AZURE_OPENAI_DEPLOYMENT_INTENT = os.getenv("AZURE_OPENAI_DEPLOYMENT_INTENT", "gpt-4o-mini")
 
 # 🔹 Azure OpenAI SDK client
 openai_client = AzureOpenAI(
@@ -173,9 +174,10 @@ def detect_intent_openai(query):
         {"role": "user", "content": query}
     ]
     result = openai_client.chat.completions.create(
-        model=AZURE_OPENAI_DEPLOYMENT,
+        model=AZURE_OPENAI_DEPLOYMENT_INTENT,
         messages=messages,
-        max_completion_tokens=100
+        temperature=0,
+        max_tokens=10
     )
     intent = result.choices[0].message.content.strip().lower()
     if intent not in VALID_INTENTS:
