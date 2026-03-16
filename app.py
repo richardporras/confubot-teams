@@ -141,7 +141,11 @@ def generate_embedding(text: str) -> List[float]:
         return [0.0] * 1536
 
 def detect_intent(query):
-    return detect_intent_local(query)
+    try:
+        return detect_intent_openai(query)
+    except Exception as e:
+        logging.warning(f"⚠️ Fallback a intent local: {e}")
+        return detect_intent_local(query)
 
 def detect_intent_local(query):
     """Detección de intención local - sin llamadas a API"""
@@ -163,16 +167,21 @@ def detect_intent_local(query):
     return 'consulta_directa'
 
 def detect_intent_openai(query):
+    VALID_INTENTS = {'resumen', 'extraccion', 'procedimiento', 'consulta_directa'}
     messages = [
-        {"role": "system", "content": "Clasifica esta consulta como 'resumen', 'extraccion', 'procedimiento' o 'consulta_directa'. Solo responde con una de esas palabras."},
+        {"role": "system", "content": "Clasifica esta consulta como 'resumen', 'extraccion', 'procedimiento' o 'consulta_directa'. Responde SOLO con una de esas palabras exactas, sin explicación."},
         {"role": "user", "content": query}
     ]
     result = openai_client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
-        max_completion_tokens=10
+        max_completion_tokens=100
     )
-    return result.choices[0].message.content.strip().lower()
+    intent = result.choices[0].message.content.strip().lower()
+    if intent not in VALID_INTENTS:
+        logging.warning(f"⚠️ Intent inesperado del LLM: '{intent}', usando fallback local")
+        return detect_intent_local(query)
+    return intent
 
 def search_azure(query) -> List[Dict]:
     return search_azure_hybrid(query)
