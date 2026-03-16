@@ -171,7 +171,7 @@ def detect_intent_openai(query):
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
         temperature=0,
-        max_tokens=10
+        max_completion_tokens=10
     )
     return result.choices[0].message.content.strip().lower()
 
@@ -293,7 +293,7 @@ def generate_openai_response(query, context, intent):
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
         temperature=0.2,
-        max_tokens=1200
+        max_completion_tokens=1200
     )
     return result.choices[0].message.content
 
