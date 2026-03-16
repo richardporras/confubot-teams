@@ -170,7 +170,6 @@ def detect_intent_openai(query):
     result = openai_client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
-        temperature=0,
         max_completion_tokens=10
     )
     return result.choices[0].message.content.strip().lower()
@@ -292,7 +291,6 @@ def generate_openai_response(query, context, intent):
     result = openai_client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
-        temperature=0.2,
         max_completion_tokens=1200
     )
     return result.choices[0].message.content
