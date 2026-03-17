@@ -338,8 +338,8 @@ def generate_openai_response(query, context, intent):
     result = openai_client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
-        max_completion_tokens=2048,
-        reasoning_effort="low",
+        max_tokens=2048,
+        temperature=0.3,
         response_format={
             "type": "json_schema",
             "json_schema": {
