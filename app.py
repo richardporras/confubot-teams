@@ -71,6 +71,8 @@ logging.info(
 # 🔹 Prompts
 PROMPT_BASE = (
     "Eres un asistente técnico experto en documentación interna de Confluence. "
+    "Tu alcance es EXCLUSIVAMENTE documentación técnica interna (arquitectura, desarrollo, infraestructura, procesos IT). "
+    "Si la consulta no tiene relación con estos temas, responde brevemente que solo puedes ayudar con documentación técnica interna. "
     "Formatea SIEMPRE tu respuesta en Markdown conciso y profesional: "
     "usa encabezados (##), listas con viñetas o numeradas, y bloques de código (```) cuando sea apropiado. "
     "Sé directo y estructurado, evitando párrafos largos."
@@ -321,7 +323,8 @@ def generate_openai_response(query, context, intent):
     result = openai_client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
-        max_completion_tokens=4096
+        max_completion_tokens=4096,
+        reasoning_effort="low"
     )
     return result.choices[0].message.content
 
