@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import json
 import re
 import requests
 import logging
@@ -308,13 +309,18 @@ def build_context(search_results, max_total_chars=60000):
     return "\n".join(context_parts)
 
 
+RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.5"))
+
 def generate_openai_response(query, context, intent):
     instruction = (
         f"{PROMPT_BASE} {INTENT_PROMPTS.get(intent, INTENT_PROMPTS['consulta_directa'])} "
         "Responde únicamente usando el contenido proporcionado. "
         "Si la pregunta es ambigua, demasiado corta o genérica (ej: una sola palabra), "
         "pide al usuario que concrete su consulta en 1-2 frases breves, sin volcar el contenido de los documentos. "
-        "Si no encuentras información relevante en los documentos, indica que no hay suficiente información."
+        "Si no encuentras información relevante en los documentos, indica que no hay suficiente información. "
+        'Responde SIEMPRE en JSON con este formato: {"answer": "<tu respuesta en markdown>", "relevance_score": <0.0-1.0>}. '
+        "relevance_score indica qué tan relevantes son los documentos proporcionados para responder la pregunta "
+        "(0.0 = sin relación, 1.0 = perfectamente relevante)."
     )
     messages = [
         {"role": "system", "content": instruction},
@@ -324,13 +330,38 @@ def generate_openai_response(query, context, intent):
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
         max_completion_tokens=4096,
-        reasoning_effort="low"
+        reasoning_effort="low",
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "bot_response",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "answer": {"type": "string"},
+                        "relevance_score": {"type": "number"}
+                    },
+                    "required": ["answer", "relevance_score"],
+                    "additionalProperties": False
+                }
+            }
+        }
     )
-    return result.choices[0].message.content
+    raw = result.choices[0].message.content
+    try:
+        parsed = json.loads(raw)
+        return parsed.get("answer", raw), parsed.get("relevance_score", 1.0)
+    except (json.JSONDecodeError, AttributeError):
+        return raw, 1.0
 
 def generate_response_by_intent(query, search_results, intent):
     context = build_context(search_results)
-    response = generate_openai_response(query, context, intent)
+    response, relevance_score = generate_openai_response(query, context, intent)
+
+    # 🔹 No mostrar enlaces si la relevancia es baja
+    if relevance_score < RELEVANCE_THRESHOLD:
+        return response
 
     # 🔹 Recoger URLs únicas con su score
     seen_urls = set()
