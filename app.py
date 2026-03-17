@@ -131,6 +131,8 @@ async def on_message_activity(turn_context: TurnContext):
         )
         return
 
+    await turn_context.send_activity(Activity(type=ActivityTypes.typing))
+
     intent = detect_intent(user_query)
     logging.info(f"🔍 Intención detectada: {intent}")
 
@@ -336,7 +338,7 @@ def generate_openai_response(query, context, intent):
     result = openai_client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=messages,
-        max_completion_tokens=4096,
+        max_completion_tokens=2048,
         reasoning_effort="low",
         response_format={
             "type": "json_schema",
