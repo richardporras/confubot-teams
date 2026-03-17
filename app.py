@@ -310,6 +310,12 @@ def build_context(search_results, max_total_chars=60000):
 
 
 RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.5"))
+LOW_RELEVANCE_MESSAGE = (
+    "No he encontrado documentación relevante para tu consulta. "
+    "Recuerda que solo puedo ayudarte con documentación técnica interna "
+    "(arquitectura, desarrollo, infraestructura, procesos IT). "
+    "Intenta reformular tu pregunta con más detalle."
+)
 
 def generate_openai_response(query, context, intent):
     instruction = (
@@ -359,9 +365,9 @@ def generate_response_by_intent(query, search_results, intent):
     context = build_context(search_results)
     response, relevance_score = generate_openai_response(query, context, intent)
 
-    # 🔹 No mostrar enlaces si la relevancia es baja
+    # 🔹 Respuesta genérica si la relevancia es baja
     if relevance_score < RELEVANCE_THRESHOLD:
-        return response
+        return LOW_RELEVANCE_MESSAGE
 
     # 🔹 Recoger URLs únicas con su score
     seen_urls = set()
