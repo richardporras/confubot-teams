@@ -137,8 +137,9 @@ async def on_message_activity(turn_context: TurnContext):
     search_results = search_azure(user_query)
     response_text = generate_response_by_intent(user_query, search_results, intent)
 
-    #logging.info(f"🤖 Respuesta del bot: {response_text}")
+    logging.info(f"🤖 Respuesta generada ({len(response_text)} chars)")
     await turn_context.send_activity(Activity(type=ActivityTypes.message, text=response_text))
+    logging.info("✅ Respuesta enviada a Teams")
 
 def generate_embedding(text: str) -> List[float]:
     """Genera embedding usando Azure OpenAI text-embedding-3-large"""
@@ -364,6 +365,7 @@ def generate_openai_response(query, context, intent):
 def generate_response_by_intent(query, search_results, intent):
     context = build_context(search_results)
     response, relevance_score = generate_openai_response(query, context, intent)
+    logging.info(f"📊 Relevance score: {relevance_score}")
 
     # 🔹 Respuesta genérica si la relevancia es baja
     if relevance_score < RELEVANCE_THRESHOLD:
