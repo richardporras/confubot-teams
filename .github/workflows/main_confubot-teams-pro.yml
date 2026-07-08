@@ -83,3 +83,4 @@ jobs:
           app-name: 'confubot-teams-pro'
           slot-name: 'Production'
           package: release.zip
+          deployment-method: zipDeploy
