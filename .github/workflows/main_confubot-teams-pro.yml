@@ -3,6 +3,9 @@
 #   - actions/upload-artifact@v4 subía un folder en vez de un .zip
 #   - azure/webapps-deploy@v3 sin `package:` caía en OneDeploy y saltaba Oryx
 #     → no se ejecutaba `pip install` en el servidor
+#   - `deployment-method: zipDeploy` NO es un input válido de v3 (GitHub lo
+#     ignora con un warning) → OneDeploy recibía el zip sin `type` y daba 409.
+#     El input correcto es `type: zip` (+ `clean: true` para evitar el lock).
 #   - venv local creado pero nunca usado (los venvs de Python no son
 #     relocatables: shebangs apuntan a /home/runner/...)
 #
@@ -83,4 +86,5 @@ jobs:
           app-name: 'confubot-teams-pro'
           slot-name: 'Production'
           package: release.zip
-          deployment-method: zipDeploy
+          type: zip
+          clean: true
